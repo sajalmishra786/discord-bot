@@ -53,5 +53,5 @@ jobs:
           tmux new -d -s discord_bot
           tmux send-keys -t discord_bot "cd \$REPO_DIR && source venv/bin/activate && python3 bot.py" C-m
 
-          echo "Deployment complete!"
+          echo "Deployment complete!!!"
         EOF
