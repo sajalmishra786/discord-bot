@@ -4,6 +4,9 @@ on:
   push:
     branches: [ main ]
 
+env:
+  REPO_DIR: "/home/ubuntu/discord-bot"  # Centralized path definition
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,21 +23,34 @@ jobs:
         
     - name: Add EC2 to known hosts
       run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        mkdir -p ~/.ssh
+        ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Copy files and restart bot
+    - name: Deploy and restart bot
       run: |
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /home/ubuntu/your-repo
-          git pull origin main
+          # Create directory if it doesn't exist
+          mkdir -p $REPO_DIR || true
+          
+          # Initialize repository if not exists
+          if [ ! -d "$REPO_DIR/.git" ]; then
+            git clone https://github.com/${{ github.repository }}.git $REPO_DIR
+            cd $REPO_DIR
+            python3 -m venv venv
+          else
+            cd $REPO_DIR
+            git fetch origin
+            git reset --hard origin/main
+          fi
+          
+          # Activate environment and install dependencies
           source venv/bin/activate
           pip install -r requirements.txt
           
-          # Kill existing tmux session if it exists
-          tmux kill-session -t discord_bot || true
-          
-          # Start new session and run bot
+          # Restart bot in tmux
+          tmux kill-session -t discord_bot 2>/dev/null || true
           tmux new -d -s discord_bot
-          tmux send-keys -t discord_bot "source venv/bin/activate && python3 bot.py" C-m
+          tmux send-keys -t discord_bot "cd $REPO_DIR && source venv/bin/activate && python3 bot.py" C-m
+          
+          echo "Deployment complete!"
         EOF
