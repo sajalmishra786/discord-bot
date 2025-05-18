@@ -31,7 +31,7 @@ jobs:
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
           set -e  # Stop on error
 
-          REPO_DIR="/home/ubuntu/discord-bot"
+          REPO_DIR="~/discord-bot"
 
           # Ensure repo directory exists
           mkdir -p \$REPO_DIR
