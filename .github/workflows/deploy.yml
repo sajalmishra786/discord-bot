@@ -1,0 +1,40 @@
+name: Deploy Discord Bot to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.EC2_SSH_KEY }}
+        known_hosts: 'just-a-placeholder'
+        
+    - name: Add EC2 to known hosts
+      run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Copy files and restart bot
+      run: |
+        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd /home/ubuntu/your-repo
+          git pull origin main
+          source venv/bin/activate
+          pip install -r requirements.txt
+          
+          # Kill existing tmux session if it exists
+          tmux kill-session -t discord_bot || true
+          
+          # Start new session and run bot
+          tmux new -d -s discord_bot
+          tmux send-keys -t discord_bot "source venv/bin/activate && python3 bot.py" C-m
+        EOF
