@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 env:
-  REPO_DIR: "/home/ubuntu/discord-bot"
+  REPO_DIR: "/home/ubuntu/discord-bot"  # Centralized path definition
 
 jobs:
   deploy:
@@ -29,46 +29,28 @@ jobs:
     - name: Deploy and restart bot
       run: |
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          # Handle system updates if needed
-          if [ -f /var/run/reboot-required ]; then
-            echo "System reboot required - performing now..."
-            sudo reboot
-            sleep 60  # Wait for reboot to complete
-          fi
+          # Create directory if it doesn't exist
+          mkdir -p $REPO_DIR || true
           
-          # Clean existing directory if corrupted
-          if [ -d "$REPO_DIR" ] && [ ! -d "$REPO_DIR/.git" ]; then
-            echo "Removing corrupted directory..."
-            rm -rf $REPO_DIR
-          fi
-          
-          # Create directory structure
-          mkdir -p $REPO_DIR
-          cd $REPO_DIR
-          
-          # Clone or update repository
-          if [ ! -d ".git" ]; then
-            git clone https://github.com/${{ github.repository }}.git .
+          # Initialize repository if not exists
+          if [ ! -d "$REPO_DIR/.git" ]; then
+            git clone https://github.com/${{ github.repository }}.git $REPO_DIR
+            cd $REPO_DIR
             python3 -m venv venv
           else
+            cd $REPO_DIR
             git fetch origin
             git reset --hard origin/main
           fi
           
-          # Verify requirements.txt exists
-          if [ ! -f "requirements.txt" ]; then
-            echo "requirements.txt missing! Creating default..."
-            echo "discord.py>=2.0.0" > requirements.txt
-          fi
-          
-          # Install dependencies
+          # Activate environment and install dependencies
           source venv/bin/activate
           pip install -r requirements.txt
           
-          # Restart bot
+          # Restart bot in tmux
           tmux kill-session -t discord_bot 2>/dev/null || true
           tmux new -d -s discord_bot
           tmux send-keys -t discord_bot "cd $REPO_DIR && source venv/bin/activate && python3 bot.py" C-m
           
-          echo "✅ Deployment successful!"
+          echo "Deployment complete!"
         EOF
