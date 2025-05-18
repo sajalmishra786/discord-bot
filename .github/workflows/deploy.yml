@@ -3,21 +3,34 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main
+      - main 
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH to EC2 and update code
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user          # or ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ec2-user/your-discord-bot
-            git pull origin main
-            # Restart systemd service
-            sudo systemctl restart discordbot.service
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "Host ec2
+            HostName ${{ secrets.EC2_HOST }}
+            User ${{ secrets.EC2_USER }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Pull latest code and restart bot
+        run: |
+          ssh ec2 "
+            cd ~/discord-bot &&
+            git pull origin main &&
+            python3 -m pip install --upgrade pip &&
+            pip3 install -r requirements.txt &&
+            tmux kill-session -t discordbot || true &&
+            tmux new-session -d -s discordbot 'python3 bot.py'
+          "
