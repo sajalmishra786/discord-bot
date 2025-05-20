@@ -64,4 +64,5 @@ async def on_ready():
     bot.add_view(EODView())
     print(f"Logged in as {bot.user}!")
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+bot.run(os.getenv("BOT_TOKEN"))
+
