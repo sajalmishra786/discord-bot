@@ -50,7 +50,7 @@ async def setup(ctx):
     eod_channel = bot.get_channel(EOD_CHANNEL_ID)
 
     if attendance_channel:
-        await attendance_channel.send("🎯 Click below to mark your attendance!", view=AttendanceView())
+        await attendance_channel.send("🎯 Click below to mark your attendance!!!", view=AttendanceView())
 
     if eod_channel:
         await eod_channel.send("📆 Click below to submit your end-of-day report!", view=EODView())

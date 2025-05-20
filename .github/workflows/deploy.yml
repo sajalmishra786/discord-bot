@@ -1,63 +1,35 @@
-name: Deploy Discord Bot to EC2
+name: Deploy to EC2 with Docker
 
 on:
   push:
-    branches: [ main ]
-
-env:
-  REPO_DIR: "/home/ubuntu/discord-bot"
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install SSH key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.EC2_SSH_KEY }}
-        known_hosts: 'just-a-placeholder'
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-    - name: Add EC2 to known hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      - name: Copy files to EC2
+        run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.EC2_HOST }}:/home/ubuntu/discord-bot
 
-    - name: Deploy and restart bot
-      run: |
-        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          set -e  # Stop on error
-
-          REPO_DIR="~/discord-bot"
-
-          # Ensure repo directory exists
-          mkdir -p \$REPO_DIR
-
-          # Clone or update the repo
-          if [ ! -d "\$REPO_DIR/.git" ]; then
-            git clone https://github.com/${{ github.repository }}.git \$REPO_DIR
-          fi
-
-          cd \$REPO_DIR
-          git fetch origin
-          git reset --hard origin/main
-
-          # Recreate virtual environment
-          rm -rf venv
-          python3 -m venv venv
-          source venv/bin/activate
-
-          # Upgrade pip and install requirements
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-          # Restart bot using tmux
-          tmux kill-session -t discord_bot 2>/dev/null || true
-          tmux new -d -s discord_bot
-          tmux send-keys -t discord_bot "cd \$REPO_DIR && source venv/bin/activate && python3 bot.py" C-m
-
-          echo "Deployment complete!!"
-        EOF
+      - name: Deploy container on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_HOST }} << 'EOF'
+            cd /home/ubuntu/discord-bot
+            docker stop discord-bot || true
+            docker rm discord-bot || true
+            docker build -t discord-bot .
+            docker run -d --name discord-bot \
+              -e BOT_TOKEN=${{ secrets.BOT_TOKEN }} \
+              --restart unless-stopped \
+              discord-bot
+          EOF
