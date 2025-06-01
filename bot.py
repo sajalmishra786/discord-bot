@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-
+import os
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -14,4 +14,4 @@ async def on_ready():
     print(f"Logged in as {bot.user}!")
 
 # Replace with your actual token
-bot.run("YOUR_BOT_TOKEN_HERE")
+bot.run(os.getenv("BOT_TOKEN"))
